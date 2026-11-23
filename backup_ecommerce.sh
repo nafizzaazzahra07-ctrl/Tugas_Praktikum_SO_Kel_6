@@ -5,7 +5,8 @@
 # Description: Otomasi Monitoring Sistem/Layanan, Backup, dan Restore Terverifikasi
 # ==============================================================================
 
-LOG_FILE="${LOG_FILE:-backup_activity.log}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_FILE="${LOG_FILE:-${SCRIPT_DIR}/backup_activity.log}"
 MAX_DISK_USAGE="${MAX_DISK_USAGE:-85}"
 REQUIRED_SERVICE="${REQUIRED_SERVICE:-cron}"
 
@@ -78,7 +79,11 @@ perform_backup() {
 
     log_message "INFO" "Memulai proses backup dari '$SRC_DIR' ke '$BACKUP_PATH'..."
     if tar -czf "$BACKUP_PATH" -C "$SRC_DIR" . 2>> "${LOG_FILE}"; then
-        sha256sum "$BACKUP_PATH" > "${BACKUP_PATH}.sha256"
+        local ABS_ARCHIVE_DIR
+        ABS_ARCHIVE_DIR=$(cd "$(dirname "$BACKUP_PATH")" && pwd)
+        local ARCHIVE_BASENAME
+        ARCHIVE_BASENAME=$(basename "$BACKUP_PATH")
+        (cd "$ABS_ARCHIVE_DIR" && sha256sum "$ARCHIVE_BASENAME") > "${BACKUP_PATH}.sha256"
         log_message "SUCCESS" "Backup berhasil disimpan di '$BACKUP_PATH' beserta checksum SHA256."
         exit 0
     else
@@ -104,7 +109,11 @@ perform_restore() {
 
     if [ -f "${ARCHIVE_PATH}.sha256" ]; then
         log_message "INFO" "Memverifikasi checksum arsip sebelum restore..."
-        if ! (cd "$(dirname "$ARCHIVE_PATH")" && sha256sum -c "$(basename "${ARCHIVE_PATH}.sha256")") >> "${LOG_FILE}" 2>&1; then
+        local ABS_ARCHIVE_DIR
+        ABS_ARCHIVE_DIR=$(cd "$(dirname "$ARCHIVE_PATH")" && pwd)
+        local SHA_BASENAME
+        SHA_BASENAME=$(basename "${ARCHIVE_PATH}.sha256")
+        if ! (cd "$ABS_ARCHIVE_DIR" && sha256sum -c "$SHA_BASENAME" >> "${LOG_FILE}" 2>&1); then
             log_message "ERROR" "Verifikasi checksum gagal! Arsip mungkin rusak atau berubah."
             exit 8
         fi
